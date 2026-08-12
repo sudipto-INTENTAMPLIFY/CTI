@@ -45,15 +45,19 @@ jobs:
         run: |
           set -euo pipefail
           for page in index.html services.html pricing.html blog.html research.html case-studies.html vendors.html intelligence.html contact.html; do
-            curl -fsS "http://127.0.0.1:4173/$page" | grep -q '/RC11_LOADER.js'
-            curl -fsS "http://127.0.0.1:4173/$page" | grep -q '/RC11_LIVE_CONTENT.js'
+            curl -fsS "http://127.0.0.1:4173/$page" -o /tmp/page
+            grep -q '/RC11_LOADER.js' /tmp/page
+            grep -q '/RC11_LIVE_CONTENT.js' /tmp/page
           done
-          curl -fsS http://127.0.0.1:4173/RC11_RUNTIME.js | grep -q 'RC11.1'
-          curl -fsS http://127.0.0.1:4173/RC11_RUNTIME.js | grep -q 'qualification_form_submit'
-          curl -fsS http://127.0.0.1:4173/RC11_RUNTIME.js | grep -q 'crm_handoff_success'
-          curl -fsS http://127.0.0.1:4173/RC11_RUNTIME.js | grep -q 'cti:first_touch'
-          curl -fsS http://127.0.0.1:4173/data/evidence-graph.json | grep -q '"schema": "cti.evidence_graph.v1"'
-          curl -fsS http://127.0.0.1:4173/data/live-content.json | grep -q '"schema": "cti.live_content.v1"'
+          curl -fsS http://127.0.0.1:4173/RC11_RUNTIME.js -o /tmp/runtime
+          grep -q 'RC11.1' /tmp/runtime
+          grep -q 'qualification_form_submit' /tmp/runtime
+          grep -q 'crm_handoff_success' /tmp/runtime
+          grep -q 'cti:first_touch' /tmp/runtime
+          curl -fsS http://127.0.0.1:4173/data/evidence-graph.json -o /tmp/evidence
+          grep -q '"schema": "cti.evidence_graph.v1"' /tmp/evidence
+          curl -fsS http://127.0.0.1:4173/data/live-content.json -o /tmp/live-content
+          grep -q '"schema": "cti.live_content.v1"' /tmp/live-content
           echo 'Local served-artifact evidence PASS'
       - name: Create artifact manifest and checksums
         run: |
@@ -78,10 +82,14 @@ jobs:
       - name: Verify staging release and live campaign continuity
         run: |
           set -euo pipefail
-          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/RC11_RUNTIME.js" | grep -q 'RC11.1'
-          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/data/evidence-graph.json" | grep -q '"schema": "cti.evidence_graph.v1"'
-          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/data/live-content.json" | grep -q '"schema": "cti.live_content.v1"'
-          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/RC11_LIVE_CONTENT.js" | grep -q 'live_campaign_click'
+          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/RC11_RUNTIME.js" -o /tmp/staging-runtime
+          grep -q 'RC11.1' /tmp/staging-runtime
+          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/data/evidence-graph.json" -o /tmp/staging-evidence
+          grep -q '"schema": "cti.evidence_graph.v1"' /tmp/staging-evidence
+          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/data/live-content.json" -o /tmp/staging-live-content
+          grep -q '"schema": "cti.live_content.v1"' /tmp/staging-live-content
+          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/RC11_LIVE_CONTENT.js" -o /tmp/staging-live-runtime
+          grep -q 'live_campaign_click' /tmp/staging-live-runtime
           for page in index.html services.html pricing.html blog.html research.html case-studies.html vendors.html intelligence.html contact.html; do curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/$page" >/dev/null; done
           echo "Live staging origin + campaign content evidence PASS: $STAGING_URL"
       - name: Verify staging API surfaces
