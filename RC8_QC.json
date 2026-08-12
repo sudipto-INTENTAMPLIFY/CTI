@@ -1,0 +1,67 @@
+{
+  "baseline_zip_sha256": "87975690459df13df0f45298281c9ab3c1dabb919038402cd1233ea6801cebd6",
+  "derived_not_overwritten": true,
+  "html_pages": [
+    {
+      "path": "blog.html",
+      "size": 508418,
+      "chatbot": true,
+      "call_route": false
+    },
+    {
+      "path": "case-studies.html",
+      "size": 508426,
+      "chatbot": true,
+      "call_route": false
+    },
+    {
+      "path": "contact.html",
+      "size": 508421,
+      "chatbot": true,
+      "call_route": false
+    },
+    {
+      "path": "index.html",
+      "size": 508414,
+      "chatbot": true,
+      "call_route": false
+    },
+    {
+      "path": "intelligence.html",
+      "size": 508426,
+      "chatbot": true,
+      "call_route": false
+    },
+    {
+      "path": "pricing.html",
+      "size": 508421,
+      "chatbot": true,
+      "call_route": false
+    },
+    {
+      "path": "research.html",
+      "size": 508422,
+      "chatbot": true,
+      "call_route": false
+    },
+    {
+      "path": "services.html",
+      "size": 508422,
+      "chatbot": true,
+      "call_route": false
+    },
+    {
+      "path": "vendors.html",
+      "size": 508421,
+      "chatbot": true,
+      "call_route": false
+    }
+  ],
+  "chatbot_global": true,
+  "qualified_call_phone": "+16028986394",
+  "booking_feature_gated": true,
+  "signal_endpoint": "/api/signals",
+  "crm_endpoint": "/api/website-leads",
+  "invented_social_proof_added": false,
+  "hostinger_generation_credits_used": 0
+}

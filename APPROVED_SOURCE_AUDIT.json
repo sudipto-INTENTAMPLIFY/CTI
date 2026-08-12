@@ -1,0 +1,31 @@
+{
+  "source": "Original Perplexity compiled bundle provided in session",
+  "css_bytes": 82109,
+  "js_bytes": 412778,
+  "pages": {
+    "index.html": "/",
+    "services.html": "/services",
+    "pricing.html": "/pricing",
+    "blog.html": "/blog",
+    "research.html": "/research",
+    "case-studies.html": "/case-studies",
+    "vendors.html": "/vendors",
+    "intelligence.html": "/intelligence",
+    "contact.html": "/contact"
+  },
+  "exact_strings_verified": {
+    "services_modular": true,
+    "services_four_phases": true,
+    "pricing_investment": true,
+    "pricing_faq": true,
+    "home_pipeline": true,
+    "intel_live": true,
+    "gtm_diagnostic": true,
+    "activation_build": true,
+    "fractional": true
+  },
+  "css_inlined_every_page": true,
+  "compiled_bundle_inlined_every_page": true,
+  "logo_inlined": true,
+  "hostinger_credits_used": 0
+}
