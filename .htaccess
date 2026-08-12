@@ -2,6 +2,8 @@ Options -Indexes
 RewriteEngine On
 RewriteRule ^api/website-leads/?$ api/website-leads.php [L,QSA]
 RewriteRule ^api/signals/?$ api/signals.php [L,QSA]
+RewriteRule ^api/content/?$ api/content.php [L,QSA]
+RewriteRule ^api/vendors/?$ api/vendors.php [L,QSA]
 
 <IfModule mod_headers.c>
   Header always set X-Content-Type-Options "nosniff"
