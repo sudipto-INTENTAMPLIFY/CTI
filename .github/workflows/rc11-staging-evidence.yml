@@ -31,11 +31,17 @@ jobs:
           if(Date.now()-Date.parse(d.generatedAt)>36*60*60*1000) process.exit(1);
           console.log('Dynamic campaign/event evidence PASS');
           NODE
+      - name: Verify production-safe commercial claims
+        run: |
+          set -euo pipefail
+          ! grep -Eiq '\$[0-9]+([,.][0-9]+)?([kKmM])?(/year|/yr| annually| per year)?' pricing.html docs/rc11/PUBLIC_PRICING_PAGE_SPEC.md
+          ! grep -Eiq 'guarantee(d)? (SQL|MQL|pipeline|revenue|meetings|opportunities)' pricing.html docs/rc11/PUBLIC_PRICING_PAGE_SPEC.md
+          echo 'Commercial claim quarantine PASS'
       - name: Serve built artifact locally
         run: |
           python3 -m http.server 4173 --directory dist >/tmp/cti-http.log 2>&1 &
           sleep 2
-      - name: Verify all nine pages and runtime assets
+      - name: Verify candidate routes and runtime assets
         run: |
           set -euo pipefail
           for page in index.html services.html pricing.html blog.html research.html case-studies.html vendors.html intelligence.html contact.html; do
@@ -43,9 +49,18 @@ jobs:
             curl -fsS "http://127.0.0.1:4173/$page" | grep -q '/RC11_LIVE_CONTENT.js'
           done
           curl -fsS http://127.0.0.1:4173/RC11_RUNTIME.js | grep -q 'RC11.1'
+          curl -fsS http://127.0.0.1:4173/RC11_RUNTIME.js | grep -q 'qualification_form_submit'
+          curl -fsS http://127.0.0.1:4173/RC11_RUNTIME.js | grep -q 'crm_handoff_success'
+          curl -fsS http://127.0.0.1:4173/RC11_RUNTIME.js | grep -q 'cti:first_touch'
           curl -fsS http://127.0.0.1:4173/data/evidence-graph.json | grep -q '"schema": "cti.evidence_graph.v1"'
           curl -fsS http://127.0.0.1:4173/data/live-content.json | grep -q '"schema": "cti.live_content.v1"'
           echo 'Local served-artifact evidence PASS'
+      - name: Create artifact manifest and checksums
+        run: |
+          set -euo pipefail
+          find dist -type f -print0 | sort -z | xargs -0 sha256sum > dist/SHA256SUMS.txt
+          printf '{"release":"RC9-HARDENED","gitSha":"%s","runId":"%s","builtAt":"%s"}\n' "${GITHUB_SHA}" "${GITHUB_RUN_ID}" "$(date -u +%FT%TZ)" > dist/release-manifest.json
+          cat dist/release-manifest.json
       - name: Upload immutable candidate artifact
         uses: actions/upload-artifact@v4
         with:
@@ -63,11 +78,11 @@ jobs:
       - name: Verify staging release and live campaign continuity
         run: |
           set -euo pipefail
-          curl -fsS "$STAGING_URL/RC11_RUNTIME.js" | grep -q 'RC11.1'
-          curl -fsS "$STAGING_URL/data/evidence-graph.json" | grep -q '"schema": "cti.evidence_graph.v1"'
-          curl -fsS "$STAGING_URL/data/live-content.json" | grep -q '"schema": "cti.live_content.v1"'
-          curl -fsS "$STAGING_URL/RC11_LIVE_CONTENT.js" | grep -q 'live_campaign_click'
-          for page in index.html services.html pricing.html blog.html research.html case-studies.html vendors.html intelligence.html contact.html; do curl -fsS "$STAGING_URL/$page" >/dev/null; done
+          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/RC11_RUNTIME.js" | grep -q 'RC11.1'
+          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/data/evidence-graph.json" | grep -q '"schema": "cti.evidence_graph.v1"'
+          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/data/live-content.json" | grep -q '"schema": "cti.live_content.v1"'
+          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/RC11_LIVE_CONTENT.js" | grep -q 'live_campaign_click'
+          for page in index.html services.html pricing.html blog.html research.html case-studies.html vendors.html intelligence.html contact.html; do curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/$page" >/dev/null; done
           echo "Live staging origin + campaign content evidence PASS: $STAGING_URL"
       - name: Verify staging API surfaces
         run: |
@@ -77,6 +92,12 @@ jobs:
             if [ "$status" -lt 200 ] || [ "$status" -ge 500 ]; then echo "API gate failed: $endpoint -> HTTP $status"; cat /tmp/resp || true; exit 1; fi
           done
           echo 'Live staging API reachability evidence PASS'
+      - name: Verify malformed lead input is rejected safely
+        run: |
+          set -euo pipefail
+          status=$(curl -sS -o /tmp/lead-bad -w '%{http_code}' -X POST "$STAGING_URL/api/website-leads" -H 'content-type: application/json' --data '{"schema":"cti.website_lead.v2","identity":{"email":"not-an-email"}}' || true)
+          case "$status" in 400|409|415|422|429) ;; *) echo "Malformed-input gate failed: HTTP $status"; cat /tmp/lead-bad || true; exit 1;; esac
+          echo 'Malformed-input rejection evidence PASS'
       - name: Verify security headers
         run: |
           set -euo pipefail
@@ -86,4 +107,13 @@ jobs:
           grep -Eiq '^x-content-type-options: *nosniff' "$headers"
           grep -Eiq '^referrer-policy:' "$headers"
           grep -Eiq '^strict-transport-security:' "$headers"
+          grep -Eiq '^permissions-policy:' "$headers"
           echo 'Security-header evidence PASS'
+      - name: Verify SEO control surfaces
+        run: |
+          set -euo pipefail
+          curl -fsS "$STAGING_URL/robots.txt" >/tmp/robots
+          curl -fsS "$STAGING_URL/sitemap.xml" >/tmp/sitemap
+          grep -Eiq 'sitemap:' /tmp/robots
+          grep -Eiq '<urlset|<sitemapindex' /tmp/sitemap
+          echo 'SEO control-surface evidence PASS'
