@@ -1,0 +1,79 @@
+name: RC11 Staging Evidence
+
+on:
+  push:
+    branches: [RC11]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  artifact-and-static-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Synchronize public production campaign/event content
+        run: node scripts/sync-live-content.mjs
+      - name: Build RC11 staging artifact
+        run: node scripts/build-rc11-staging.mjs
+      - name: Verify RC11 static evidence
+        run: node scripts/verify-rc11.mjs
+      - name: Verify live-content snapshot
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'); const d=JSON.parse(fs.readFileSync('dist/data/live-content.json','utf8'));
+          if(d.schema!=='cti.live_content.v1') process.exit(1);
+          if(d.sources.length<3 || d.sources.some(x=>x.status!=='healthy')) process.exit(1);
+          if(Date.now()-Date.parse(d.generatedAt)>36*60*60*1000) process.exit(1);
+          console.log('Dynamic campaign/event evidence PASS');
+          NODE
+      - name: Serve built artifact locally
+        run: |
+          python3 -m http.server 4173 --directory dist >/tmp/cti-http.log 2>&1 &
+          sleep 2
+      - name: Verify all nine served pages and RC11 assets
+        run: |
+          set -euo pipefail
+          for page in index.html services.html pricing.html blog.html research.html case-studies.html vendors.html intelligence.html contact.html; do
+            curl -fsS "http://127.0.0.1:4173/$page" | grep -q '/RC11_LOADER.js'
+            curl -fsS "http://127.0.0.1:4173/$page" | grep -q '/RC11_LIVE_CONTENT.js'
+          done
+          curl -fsS http://127.0.0.1:4173/RC11_RUNTIME.js | grep -q 'RC11.1'
+          curl -fsS http://127.0.0.1:4173/data/evidence-graph.json | grep -q '"schema": "cti.evidence_graph.v1"'
+          curl -fsS http://127.0.0.1:4173/data/live-content.json | grep -q '"schema": "cti.live_content.v1"'
+          echo 'Local served-artifact evidence PASS'
+      - name: Upload staging artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc11-staging-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  live-staging-evidence:
+    needs: artifact-and-static-evidence
+    runs-on: ubuntu-latest
+    env:
+      STAGING_URL: https://staging.cybertechintelligence.com
+    steps:
+      - name: Verify staging origin, RC11 release and dynamic campaign snapshot
+        run: |
+          set -euo pipefail
+          curl -fsS "$STAGING_URL/RC11_RUNTIME.js" | grep -q 'RC11.1'
+          curl -fsS "$STAGING_URL/data/evidence-graph.json" | grep -q '"schema": "cti.evidence_graph.v1"'
+          curl -fsS "$STAGING_URL/data/live-content.json" | grep -q '"schema": "cti.live_content.v1"'
+          curl -fsS "$STAGING_URL/RC11_LIVE_CONTENT.js" | grep -q 'live_campaign_click'
+          for page in index.html services.html pricing.html blog.html research.html case-studies.html vendors.html intelligence.html contact.html; do curl -fsS "$STAGING_URL/$page" >/dev/null; done
+          echo "Live staging origin + campaign content evidence PASS: $STAGING_URL"
+      - name: Verify staging API surfaces
+        run: |
+          set -euo pipefail
+          for endpoint in /api/content /api/vendors /api/intelligence/threats; do
+            status=$(curl -sS -o /tmp/resp -w '%{http_code}' "$STAGING_URL$endpoint" || true)
+            if [ "$status" -lt 200 ] || [ "$status" -ge 400 ]; then echo "API gate failed: $endpoint -> HTTP $status"; cat /tmp/resp || true; exit 1; fi
+          done
+          echo 'Live staging API evidence PASS'
