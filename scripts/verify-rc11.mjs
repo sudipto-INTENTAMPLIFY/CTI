@@ -25,7 +25,9 @@ const required = [
   ['dist/api/_lib.php', 'cti_idempotency_read'],
   ['dist/api/_lib.php', 'crm_https_required'],
   ['dist/api/signals.php', 'analytics_consent_absent'],
-  ['dist/api/.htaccess', 'website-leads.php']
+  ['dist/api/.htaccess', 'website-leads.php'],
+  ['dist/.htaccess', 'api/website-leads.php'],
+  ['dist/.htaccess', 'X-Content-Type-Options']
 ];
 for (const [file, needle] of required) {
   const text = await readFile(file, 'utf8');
@@ -37,4 +39,4 @@ if (graph.schema !== 'cti.evidence_graph.v1') throw new Error('Evidence graph sc
 if (!graph.policy?.factRequiresEvidence || graph.policy?.expiredEvidenceMaySupportLiveClaim !== false) throw new Error('Evidence governance policy invalid');
 if (!graph.nodes?.some(n => n.id === 'evidence:linkedin' && n.status === 'verified')) throw new Error('Verified LinkedIn evidence missing');
 
-console.log(`RC11 static evidence checks PASS for ${pages.length} pages + staging API contract.`);
+console.log(`RC11 static evidence checks PASS for ${pages.length} pages + staging API contract/routes.`);
