@@ -18,7 +18,14 @@ const required = [
   ['dist/RC11_RUNTIME.js', 'firstTouch'],
   ['dist/RC11_RUNTIME.js', 'latestTouch'],
   ['dist/CONVERSION_LAYER_CONFIG.js', 'qualificationAuthority: "server"'],
-  ['dist/CONVERSION_LAYER_CONFIG.js', 'identityAndPermissionAreSeparate: true']
+  ['dist/CONVERSION_LAYER_CONFIG.js', 'identityAndPermissionAreSeparate: true'],
+  ['dist/api/website-leads.php', 'cti.website_lead.v2'],
+  ['dist/api/website-leads.php', 'privacy_acceptance_required'],
+  ['dist/api/website-leads.php', 'cti_suitecrm_create_lead'],
+  ['dist/api/_lib.php', 'cti_idempotency_read'],
+  ['dist/api/_lib.php', 'crm_https_required'],
+  ['dist/api/signals.php', 'analytics_consent_absent'],
+  ['dist/api/.htaccess', 'website-leads.php']
 ];
 for (const [file, needle] of required) {
   const text = await readFile(file, 'utf8');
@@ -30,4 +37,4 @@ if (graph.schema !== 'cti.evidence_graph.v1') throw new Error('Evidence graph sc
 if (!graph.policy?.factRequiresEvidence || graph.policy?.expiredEvidenceMaySupportLiveClaim !== false) throw new Error('Evidence governance policy invalid');
 if (!graph.nodes?.some(n => n.id === 'evidence:linkedin' && n.status === 'verified')) throw new Error('Verified LinkedIn evidence missing');
 
-console.log(`RC11 static evidence checks PASS for ${pages.length} pages.`);
+console.log(`RC11 static evidence checks PASS for ${pages.length} pages + staging API contract.`);
