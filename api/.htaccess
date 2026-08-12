@@ -2,6 +2,8 @@ Options -Indexes
 RewriteEngine On
 RewriteRule ^website-leads/?$ website-leads.php [L,QSA]
 RewriteRule ^signals/?$ signals.php [L,QSA]
+RewriteRule ^content/?$ content.php [L,QSA]
+RewriteRule ^vendors/?$ vendors.php [L,QSA]
 
 <FilesMatch "^_">
   Require all denied
