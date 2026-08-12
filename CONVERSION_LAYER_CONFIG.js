@@ -1,8 +1,10 @@
 window.CTI_CONVERSION = {
   buyerPhone: "+16028986394",
-  bookingUrl: "", // add only after authoritative booking URL is approved
-  crmPath: "/api/website-leads",
-  signalPath: "/api/signals",
+  bookingUrl: "",
+  crmPath: "/api/website-leads.php",
+  signalPath: "/api/signals.php",
+  contentPath: "/api/content.php",
+  vendorsPath: "/api/vendors.php",
   evidenceGraphPath: "/data/evidence-graph.json",
   qualificationThreshold: 70,
   qualificationAuthority: "server",
