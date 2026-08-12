@@ -29,17 +29,16 @@ jobs:
           retention-days: 14
 
   live-staging-evidence:
-    if: ${{ vars.RC11_STAGING_URL != '' }}
     needs: artifact-and-static-evidence
     runs-on: ubuntu-latest
+    env:
+      STAGING_URL: https://staging.cybertechintelligence.com
     steps:
       - name: Verify staging origin
-        env:
-          STAGING_URL: ${{ vars.RC11_STAGING_URL }}
         run: |
           set -euo pipefail
           curl -fsS "$STAGING_URL/" -o /tmp/index.html
           curl -fsS "$STAGING_URL/RC11_RUNTIME.js" | grep -q "RC11.1"
           curl -fsS "$STAGING_URL/data/evidence-graph.json" | grep -q '"schema": "cti.evidence_graph.v1"'
           curl -fsSI "$STAGING_URL/" > /tmp/headers.txt
-          echo "Staging static origin checks PASS"
+          echo "Staging static origin checks PASS: $STAGING_URL"
