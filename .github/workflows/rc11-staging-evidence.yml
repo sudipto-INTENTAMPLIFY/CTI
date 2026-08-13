@@ -1,0 +1,182 @@
+name: RC9 Go-Live Readiness
+
+on:
+  push:
+    branches: [rc9-go-live-hardening]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  artifact-and-static-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Synchronize public production campaign/event content
+        run: node scripts/sync-live-content.mjs
+      - name: Build release artifact
+        run: node scripts/build-rc11-staging.mjs
+      - name: Verify packaged PHP syntax
+        run: |
+          set -euo pipefail
+          find dist -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Verify static evidence
+        run: node scripts/verify-rc11.mjs
+      - name: Verify dynamic campaign/event snapshot
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'); const d=JSON.parse(fs.readFileSync('dist/data/live-content.json','utf8'));
+          if(d.schema!=='cti.live_content.v1') process.exit(1);
+          if(d.sources.length<3 || d.sources.some(x=>x.status!=='healthy')) process.exit(1);
+          if(Date.now()-Date.parse(d.generatedAt)>36*60*60*1000) process.exit(1);
+          console.log('Dynamic campaign/event evidence PASS');
+          NODE
+      - name: Verify production-safe commercial claims
+        run: |
+          set -euo pipefail
+          ! grep -Eiq '\$[0-9]+([,.][0-9]+)?([kKmM])?(/year|/yr| annually| per year)?' pricing.html docs/rc11/PUBLIC_PRICING_PAGE_SPEC.md
+          ! grep -Eiq 'guarantee(d)? (SQL|MQL|pipeline|revenue|meetings|opportunities)' pricing.html docs/rc11/PUBLIC_PRICING_PAGE_SPEC.md
+          echo 'Commercial claim quarantine PASS'
+      - name: Serve built artifact locally
+        run: |
+          python3 -m http.server 4173 --directory dist >/tmp/cti-http.log 2>&1 &
+          sleep 2
+      - name: Verify candidate routes and runtime assets
+        run: |
+          set -euo pipefail
+          for page in index.html services.html pricing.html blog.html research.html case-studies.html vendors.html intelligence.html contact.html; do
+            curl -fsS "http://127.0.0.1:4173/$page" -o /tmp/page
+            grep -q '/RC11_LOADER.js' /tmp/page
+            grep -q '/RC11_LIVE_CONTENT.js' /tmp/page
+          done
+          test -f dist/admin.html
+          test -f dist/CTI_ADMIN.js
+          test -f dist/api/content.php
+          test -f dist/api/vendors.php
+          test -f dist/api/pricing.php
+          test -f dist/api/website-leads.php
+          test -f dist/.htaccess
+          test -f dist/api/.htaccess
+          test -f dist/robots.txt
+          test -f dist/sitemap.xml
+          curl -fsS http://127.0.0.1:4173/RC11_RUNTIME.js -o /tmp/runtime
+          grep -q 'RC11.1' /tmp/runtime
+          grep -q 'qualification_form_submit' /tmp/runtime
+          grep -q 'crm_handoff_success' /tmp/runtime
+          grep -q 'cti:first_touch' /tmp/runtime
+          curl -fsS http://127.0.0.1:4173/data/evidence-graph.json -o /tmp/evidence
+          grep -q '"schema": "cti.evidence_graph.v1"' /tmp/evidence
+          curl -fsS http://127.0.0.1:4173/data/live-content.json -o /tmp/live-content
+          grep -q '"schema": "cti.live_content.v1"' /tmp/live-content
+          echo 'Local served-artifact evidence PASS'
+      - name: Create artifact manifest and checksums
+        run: |
+          set -euo pipefail
+          printf '{"release":"RC9-HARDENED","gitSha":"%s","runId":"%s","builtAt":"%s"}\n' "${GITHUB_SHA}" "${GITHUB_RUN_ID}" "$(date -u +%FT%TZ)" > dist/release-manifest.json
+          find dist -type f ! -name 'SHA256SUMS.txt' -print0 | sort -z | xargs -0 sha256sum > dist/SHA256SUMS.txt
+          sha256sum -c dist/SHA256SUMS.txt
+          cat dist/release-manifest.json
+      - name: Upload immutable candidate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cti-go-live-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+
+  live-staging-evidence:
+    needs: artifact-and-static-evidence
+    runs-on: ubuntu-latest
+    env:
+      STAGING_URL: https://staging.cybertechintelligence.com
+      CTI_CMS_ADMIN_TOKEN: ${{ secrets.CTI_CMS_ADMIN_TOKEN }}
+    steps:
+      - name: Verify exact deployed release provenance
+        run: |
+          set -euo pipefail
+          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/release-manifest.json" -o /tmp/release-manifest.json
+          node -e "const m=require('/tmp/release-manifest.json'); if(m.gitSha!==process.env.GITHUB_SHA){console.error('deployed',m.gitSha,'expected',process.env.GITHUB_SHA); process.exit(1)}; console.log('Deployed SHA provenance PASS',m.gitSha)"
+      - name: Verify staging release and live campaign continuity
+        run: |
+          set -euo pipefail
+          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/RC11_RUNTIME.js" -o /tmp/staging-runtime
+          grep -q 'RC11.1' /tmp/staging-runtime
+          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/data/evidence-graph.json" -o /tmp/staging-evidence
+          grep -q '"schema": "cti.evidence_graph.v1"' /tmp/staging-evidence
+          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/data/live-content.json" -o /tmp/staging-live-content
+          grep -q '"schema": "cti.live_content.v1"' /tmp/staging-live-content
+          curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/RC11_LIVE_CONTENT.js" -o /tmp/staging-live-runtime
+          grep -q 'live_campaign_click' /tmp/staging-live-runtime
+          for page in index.html services.html pricing.html blog.html research.html case-studies.html vendors.html intelligence.html contact.html; do curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/$page" >/dev/null; done
+          echo "Live staging origin + campaign content evidence PASS: $STAGING_URL"
+      - name: Verify CMS blog research case studies and vendors
+        run: |
+          set -euo pipefail
+          for type in blog research case-study; do
+            curl -fsS "$STAGING_URL/api/content.php?type=$type" -o "/tmp/$type.json"
+            node -e "const d=require('/tmp/$type.json'); if(!Array.isArray(d.items)) process.exit(1); console.log('$type records',d.items.length)"
+          done
+          curl -fsS "$STAGING_URL/api/vendors.php" -o /tmp/vendors.json
+          node -e "const d=require('/tmp/vendors.json'); if(!Array.isArray(d.vendors)) process.exit(1); console.log('vendor records',d.vendors.length)"
+          echo 'CMS content-category evidence PASS'
+      - name: Verify pricing page and API
+        run: |
+          set -euo pipefail
+          curl -fsS "$STAGING_URL/pricing.html" -o /tmp/pricing.html
+          curl -fsS "$STAGING_URL/api/pricing.php" -o /tmp/pricing.json
+          test -s /tmp/pricing.html
+          node -e "const d=require('/tmp/pricing.json'); if(!d || typeof d!=='object') process.exit(1); console.log('Pricing API evidence PASS')"
+          ! grep -Eiq '\$[0-9]+([,.][0-9]+)?([kKmM])?(/year|/yr| annually| per year)?' /tmp/pricing.html
+          echo 'Pricing runtime evidence PASS'
+      - name: Verify explicit staging API surfaces
+        run: |
+          set -euo pipefail
+          for endpoint in /api/content.php /api/vendors.php /api/pricing.php; do
+            status=$(curl -sS -o /tmp/resp -w '%{http_code}' "$STAGING_URL$endpoint" || true)
+            if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then echo "API gate failed: $endpoint -> HTTP $status"; cat /tmp/resp || true; exit 1; fi
+          done
+          status=$(curl -sS -o /tmp/signal-get -w '%{http_code}' "$STAGING_URL/api/signals.php" || true)
+          case "$status" in 405) ;; *) echo "Signal method-guard gate failed: HTTP $status"; cat /tmp/signal-get || true; exit 1;; esac
+          echo 'Explicit live staging API reachability evidence PASS'
+      - name: Verify admin authentication and authorization
+        run: |
+          set -euo pipefail
+          unauth=$(curl -sS -o /tmp/admin-unauth -w '%{http_code}' "$STAGING_URL/api/content.php?admin=1" || true)
+          test "$unauth" = "401"
+          test -n "$CTI_CMS_ADMIN_TOKEN"
+          auth=$(curl -sS -o /tmp/admin-auth -w '%{http_code}' "$STAGING_URL/api/content.php?admin=1" -H "Authorization: Bearer $CTI_CMS_ADMIN_TOKEN" || true)
+          test "$auth" = "200"
+          curl -fsS "$STAGING_URL/admin.html" -o /tmp/admin.html
+          grep -q 'CTI Publishing Console' /tmp/admin.html
+          echo 'Admin/auth runtime evidence PASS'
+      - name: Verify malformed lead input is rejected safely
+        run: |
+          set -euo pipefail
+          status=$(curl -sS -o /tmp/lead-bad -w '%{http_code}' -X POST "$STAGING_URL/api/website-leads.php" -H 'content-type: application/json' --data '{"schema":"cti.website_lead.v2","identity":{"email":"not-an-email"}}' || true)
+          case "$status" in 400|409|415|422|429) ;; *) echo "Malformed-input gate failed: HTTP $status"; cat /tmp/lead-bad || true; exit 1;; esac
+          echo 'Malformed-input rejection evidence PASS'
+      - name: Verify security headers
+        run: |
+          set -euo pipefail
+          headers=$(mktemp)
+          curl -fsSI "$STAGING_URL/" > "$headers"
+          cat "$headers"
+          grep -Eiq '^content-security-policy:' "$headers"
+          grep -Eiq '^x-content-type-options: *nosniff' "$headers"
+          grep -Eiq '^referrer-policy:' "$headers"
+          grep -Eiq '^strict-transport-security:' "$headers"
+          grep -Eiq '^permissions-policy:' "$headers"
+          echo 'Security-header evidence PASS'
+      - name: Verify SEO control surfaces
+        run: |
+          set -euo pipefail
+          curl -fsS "$STAGING_URL/robots.txt" >/tmp/robots
+          curl -fsS "$STAGING_URL/sitemap.xml" >/tmp/sitemap
+          grep -Eiq 'sitemap:' /tmp/robots
+          grep -Eiq '<urlset|<sitemapindex' /tmp/sitemap
+          echo 'SEO control-surface evidence PASS'

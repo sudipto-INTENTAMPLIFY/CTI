@@ -1,0 +1,56 @@
+name: Monthly CTI Site Evolution
+
+on:
+  schedule:
+    - cron: '0 2 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  evolve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: RC11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify RC11 build before evolution
+        run: |
+          node scripts/build-rc11-staging.mjs
+          node scripts/verify-rc11.mjs
+      - name: Create monthly evolution branch
+        id: branch
+        run: |
+          BRANCH="automation/monthly-site-evolution-$(date -u +%Y-%m)"
+          git checkout -b "$BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+      - name: Generate monthly evidence note
+        run: |
+          mkdir -p docs/automation
+          cat > "docs/automation/monthly-site-evolution-$(date -u +%Y-%m).md" <<EOF
+          # Monthly CTI Site Evolution — $(date -u +%Y-%m)
+
+          Automated maintenance candidate generated from RC11.
+
+          - Static RC11 artifact build: PASS
+          - Static RC11 evidence verification: PASS
+          - Production deployment: NOT PERFORMED
+          - Review requirement: human review + founder approval before production release
+          EOF
+      - name: Commit candidate
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/automation
+          git commit -m "chore: monthly CTI evolution candidate $(date -u +%Y-%m)"
+          git push origin "${{ steps.branch.outputs.branch }}"
+      - name: Open review PR against RC11
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr create --base RC11 --head "${{ steps.branch.outputs.branch }}" --title "Monthly CTI site evolution $(date -u +%Y-%m)" --body "Automated maintenance candidate. No production deployment is performed by this workflow. Review evidence and approve explicitly before any release action."
