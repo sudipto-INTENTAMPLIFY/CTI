@@ -1,0 +1,89 @@
+{
+  "schema": "cti.evidence_graph.v1",
+  "generatedAt": "2026-08-12T00:00:00Z",
+  "policy": {
+    "unsupportedClaimBehavior": "UNKNOWN",
+    "factRequiresEvidence": true,
+    "inferenceMustBeLabeled": true,
+    "expiredEvidenceMaySupportLiveClaim": false,
+    "verifiedIdentitySeparateFromMarketingPermission": true
+  },
+  "nodes": [
+    {
+      "id": "claim:core-positioning",
+      "type": "claim",
+      "classification": "FACT",
+      "statement": "CyberTech Intelligence is positioned around cybersecurity intelligence, research, executive engagement, cybersecurity events and category authority.",
+      "status": "approved",
+      "owner": "Narrative",
+      "evidenceIds": ["evidence:rc11-narrative"]
+    },
+    {
+      "id": "claim:signal-model",
+      "type": "claim",
+      "classification": "FACT",
+      "statement": "The CyberTech Intelligence operating model connects owned audience, first-party signals, account context, activation and attribution.",
+      "status": "approved",
+      "owner": "Narrative",
+      "evidenceIds": ["evidence:approved-site", "evidence:rc11-narrative"]
+    },
+    {
+      "id": "claim:linkedin-profile",
+      "type": "claim",
+      "classification": "FACT",
+      "statement": "CyberTech Intelligence has a public LinkedIn company profile.",
+      "status": "verified",
+      "owner": "Marketing",
+      "evidenceIds": ["evidence:linkedin"]
+    },
+    {
+      "id": "evidence:approved-site",
+      "type": "evidence",
+      "classification": "FACT",
+      "sourceType": "approved-application-source",
+      "source": "CyberTech Intelligence approved website source",
+      "sourceUrl": null,
+      "freshness": "release-bound",
+      "status": "approved",
+      "lastVerified": "2026-08-12"
+    },
+    {
+      "id": "evidence:rc11-narrative",
+      "type": "evidence",
+      "classification": "FACT",
+      "sourceType": "governed-repository-document",
+      "source": "docs/rc11/RC11_10_OF_10_CATEGORY_LEADER_PLAN.md and related RC11 architecture",
+      "sourceUrl": null,
+      "freshness": "2026-08-12",
+      "status": "approved",
+      "lastVerified": "2026-08-12"
+    },
+    {
+      "id": "evidence:linkedin",
+      "type": "evidence",
+      "classification": "FACT",
+      "sourceType": "public-company-profile",
+      "source": "LinkedIn — CyberTech Intelligence",
+      "sourceUrl": "https://www.linkedin.com/company/cybertechintelligence",
+      "freshness": "web-verified-2026-08-12",
+      "status": "verified",
+      "lastVerified": "2026-08-12"
+    },
+    {
+      "id": "control:identity-permission-separation",
+      "type": "control",
+      "classification": "FACT",
+      "statement": "Verified identity and marketing permission are independent states and must be stored and evaluated separately.",
+      "status": "required",
+      "owner": "Governance"
+    },
+    {
+      "id": "control:browser-qualification",
+      "type": "control",
+      "classification": "FACT",
+      "statement": "Browser-side qualification is advisory only; authoritative SQL qualification is server-side.",
+      "status": "required",
+      "owner": "Platform"
+    }
+  ]
+}
