@@ -72,8 +72,9 @@ jobs:
       - name: Create artifact manifest and checksums
         run: |
           set -euo pipefail
-          find dist -type f -print0 | sort -z | xargs -0 sha256sum > dist/SHA256SUMS.txt
           printf '{"release":"RC9-HARDENED","gitSha":"%s","runId":"%s","builtAt":"%s"}\n' "${GITHUB_SHA}" "${GITHUB_RUN_ID}" "$(date -u +%FT%TZ)" > dist/release-manifest.json
+          find dist -type f ! -name 'SHA256SUMS.txt' -print0 | sort -z | xargs -0 sha256sum > dist/SHA256SUMS.txt
+          sha256sum -c dist/SHA256SUMS.txt
           cat dist/release-manifest.json
       - name: Upload immutable candidate artifact
         uses: actions/upload-artifact@v4
