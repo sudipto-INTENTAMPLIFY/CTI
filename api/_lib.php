@@ -2,6 +2,7 @@
 declare(strict_types=1);
 const CTI_API_VERSION='2026-08-13';const CTI_MAX_BODY_BYTES=65536;
 function cti_json(int $s,array $p):never{http_response_code($s);header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');echo json_encode($p,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);exit;}
+function cti_require_post():void{if(($_SERVER['REQUEST_METHOD']??'GET')!=='POST'){header('Allow: POST');cti_json(405,['ok'=>false,'error'=>'method_not_allowed']);}}
 function cti_read_json():array{$n=(int)($_SERVER['CONTENT_LENGTH']??0);if($n>CTI_MAX_BODY_BYTES)cti_json(413,['ok'=>false,'error'=>'payload_too_large']);if(!str_starts_with(strtolower((string)($_SERVER['CONTENT_TYPE']??'')),'application/json'))cti_json(415,['ok'=>false,'error'=>'content_type_must_be_application_json']);$raw=file_get_contents('php://input');try{$d=json_decode((string)$raw,true,64,JSON_THROW_ON_ERROR);}catch(Throwable){cti_json(400,['ok'=>false,'error'=>'invalid_json']);}if(!is_array($d))cti_json(400,['ok'=>false,'error'=>'json_object_required']);return$d;}
 function cti_runtime_dir():string{$d=trim((string)getenv('CTI_RUNTIME_DIR'))?:dirname(__DIR__).'/.cti_runtime';if(!is_dir($d)&&!mkdir($d,0700,true)&&!is_dir($d))cti_json(503,['ok'=>false,'error'=>'runtime_storage_unavailable']);return$d;}
 function cti_hash_ip():string{return hash_hmac('sha256',(string)($_SERVER['REMOTE_ADDR']??'unknown'),(string)(getenv('CTI_IP_HASH_SALT')?:'cti-staging'));}
