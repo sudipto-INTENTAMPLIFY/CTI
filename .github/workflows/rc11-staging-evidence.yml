@@ -49,6 +49,10 @@ jobs:
             grep -q '/RC11_LOADER.js' /tmp/page
             grep -q '/RC11_LIVE_CONTENT.js' /tmp/page
           done
+          test -f dist/api/content.php
+          test -f dist/api/vendors.php
+          test -f dist/api/pricing.php
+          test -f dist/api/website-leads.php
           curl -fsS http://127.0.0.1:4173/RC11_RUNTIME.js -o /tmp/runtime
           grep -q 'RC11.1' /tmp/runtime
           grep -q 'qualification_form_submit' /tmp/runtime
@@ -92,18 +96,18 @@ jobs:
           grep -q 'live_campaign_click' /tmp/staging-live-runtime
           for page in index.html services.html pricing.html blog.html research.html case-studies.html vendors.html intelligence.html contact.html; do curl --retry 3 --retry-all-errors -fsS "$STAGING_URL/$page" >/dev/null; done
           echo "Live staging origin + campaign content evidence PASS: $STAGING_URL"
-      - name: Verify staging API surfaces
+      - name: Verify explicit staging API surfaces
         run: |
           set -euo pipefail
-          for endpoint in /api/content /api/vendors /api/intelligence/threats /api/signals /api/website-leads; do
+          for endpoint in /api/content.php /api/vendors.php /api/pricing.php /api/signals.php; do
             status=$(curl -sS -o /tmp/resp -w '%{http_code}' "$STAGING_URL$endpoint" || true)
-            if [ "$status" -lt 200 ] || [ "$status" -ge 500 ]; then echo "API gate failed: $endpoint -> HTTP $status"; cat /tmp/resp || true; exit 1; fi
+            if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then echo "API gate failed: $endpoint -> HTTP $status"; cat /tmp/resp || true; exit 1; fi
           done
-          echo 'Live staging API reachability evidence PASS'
+          echo 'Explicit live staging API reachability evidence PASS'
       - name: Verify malformed lead input is rejected safely
         run: |
           set -euo pipefail
-          status=$(curl -sS -o /tmp/lead-bad -w '%{http_code}' -X POST "$STAGING_URL/api/website-leads" -H 'content-type: application/json' --data '{"schema":"cti.website_lead.v2","identity":{"email":"not-an-email"}}' || true)
+          status=$(curl -sS -o /tmp/lead-bad -w '%{http_code}' -X POST "$STAGING_URL/api/website-leads.php" -H 'content-type: application/json' --data '{"schema":"cti.website_lead.v2","identity":{"email":"not-an-email"}}' || true)
           case "$status" in 400|409|415|422|429) ;; *) echo "Malformed-input gate failed: HTTP $status"; cat /tmp/lead-bad || true; exit 1;; esac
           echo 'Malformed-input rejection evidence PASS'
       - name: Verify security headers
