@@ -5,6 +5,9 @@ RewriteRule ^api/signals/?$ api/signals.php [L,QSA]
 RewriteRule ^api/content/?$ api/content.php [L,QSA]
 RewriteRule ^api/vendors/?$ api/vendors.php [L,QSA]
 RewriteRule ^admin/?$ admin.html [L]
+RewriteRule ^(blog|research|resources)/([a-z0-9-]+)/?$ content-detail.php?type=$1&slug=$2 [L,QSA]
+RewriteRule ^case-studies/([a-z0-9-]+)/?$ content-detail.php?type=case-study&slug=$1 [L,QSA]
+RewriteRule ^vendors/([a-z0-9-]+)/?$ vendor-detail.php?slug=$1 [L,QSA]
 
 <IfModule mod_headers.c>
   Header always set X-Content-Type-Options "nosniff"
@@ -18,7 +21,4 @@ RewriteRule ^admin/?$ admin.html [L]
     Header always set X-Robots-Tag "noindex, nofollow, noarchive"
   </FilesMatch>
 </IfModule>
-
-<FilesMatch "^\.env|^\.cti_runtime">
-  Require all denied
-</FilesMatch>
+<FilesMatch "^\.env|^\.cti_runtime"><RequireAll>Require all denied</RequireAll></FilesMatch>
