@@ -1,5 +1,12 @@
 Options -Indexes
 RewriteEngine On
+
+# Canonical clean URLs for approved static pages. Keep APIs/detail routes ahead of the generic page mapping.
+RewriteCond %{THE_REQUEST} \s/+index\.html(?:[?\s]) [NC]
+RewriteRule ^index\.html$ / [R=301,L]
+RewriteCond %{THE_REQUEST} \s/+([a-z0-9-]+)\.html(?:[?\s]) [NC]
+RewriteRule ^([a-z0-9-]+)\.html$ /$1 [R=301,L]
+
 RewriteRule ^api/website-leads/?$ api/website-leads.php [L,QSA]
 RewriteRule ^api/signals/?$ api/signals.php [L,QSA]
 RewriteRule ^api/content/?$ api/content.php [L,QSA]
@@ -8,6 +15,9 @@ RewriteRule ^admin/?$ admin.html [L]
 RewriteRule ^(blog|research|resources)/([a-z0-9-]+)/?$ content-detail.php?type=$1&slug=$2 [L,QSA]
 RewriteRule ^case-studies/([a-z0-9-]+)/?$ content-detail.php?type=case-study&slug=$1 [L,QSA]
 RewriteRule ^vendors/([a-z0-9-]+)/?$ vendor-detail.php?slug=$1 [L,QSA]
+
+# Approved top-level pages: URL is /pricing, /blog, etc.; source document remains unchanged.
+RewriteRule ^(services|pricing|blog|research|case-studies|vendors|intelligence|contact|thank-you)/?$ $1.html [L]
 
 <IfModule mod_headers.c>
   Header always set X-Content-Type-Options "nosniff"
