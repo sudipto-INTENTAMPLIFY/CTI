@@ -20,6 +20,10 @@ jobs:
         run: node scripts/sync-live-content.mjs
       - name: Build release artifact
         run: node scripts/build-rc11-staging.mjs
+      - name: Verify packaged PHP syntax
+        run: |
+          set -euo pipefail
+          find dist -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Verify static evidence
         run: node scripts/verify-rc11.mjs
       - name: Verify dynamic campaign/event snapshot
@@ -53,6 +57,8 @@ jobs:
           test -f dist/api/vendors.php
           test -f dist/api/pricing.php
           test -f dist/api/website-leads.php
+          test -f dist/.htaccess
+          test -f dist/api/.htaccess
           curl -fsS http://127.0.0.1:4173/RC11_RUNTIME.js -o /tmp/runtime
           grep -q 'RC11.1' /tmp/runtime
           grep -q 'qualification_form_submit' /tmp/runtime
@@ -75,6 +81,7 @@ jobs:
           name: cti-go-live-${{ github.sha }}
           path: dist/
           if-no-files-found: error
+          include-hidden-files: true
           retention-days: 14
 
   live-staging-evidence:
@@ -99,10 +106,12 @@ jobs:
       - name: Verify explicit staging API surfaces
         run: |
           set -euo pipefail
-          for endpoint in /api/content.php /api/vendors.php /api/pricing.php /api/signals.php; do
+          for endpoint in /api/content.php /api/vendors.php /api/pricing.php; do
             status=$(curl -sS -o /tmp/resp -w '%{http_code}' "$STAGING_URL$endpoint" || true)
             if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then echo "API gate failed: $endpoint -> HTTP $status"; cat /tmp/resp || true; exit 1; fi
           done
+          status=$(curl -sS -o /tmp/signal-get -w '%{http_code}' "$STAGING_URL/api/signals.php" || true)
+          case "$status" in 405) ;; *) echo "Signal method-guard gate failed: HTTP $status"; cat /tmp/signal-get || true; exit 1;; esac
           echo 'Explicit live staging API reachability evidence PASS'
       - name: Verify malformed lead input is rejected safely
         run: |
